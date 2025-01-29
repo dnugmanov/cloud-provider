@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -267,6 +268,28 @@ func (cnc *CloudNodeController) UpdateNodeStatus(ctx context.Context) error {
 		klog.Errorf("Error monitoring node status: %v", err)
 		return err
 	}
+
+	var filtered []*v1.Node
+	for _, node := range nodes {
+		// Check whether the node "unmanaged" label value is explicitly set to true, in which case the node is skipped.
+		// Otherwise, the node must be considered, and we proceed to checking whether we must delete it or apply the shutdown taint.
+		if value, exists := node.Labels[cloudprovider.UnmanagedNodeLabelKey]; exists {
+			unmanagedNode, err := strconv.ParseBool(value)
+			if err != nil {
+				// Skip node if label is present and an error occurs while decoding the value
+				klog.Warningf("failed to parse the value of the %q label: %v", cloudprovider.UnmanagedNodeLabelKey, err)
+				continue
+			}
+			if unmanagedNode {
+				klog.V(6).Infof("skipping unmanaged node %q", node.Name)
+				continue
+			}
+		}
+		filtered = append(filtered, node)
+	}
+
+	nodes = filtered
+
 	defer func() {
 		klog.V(2).Infof("Update %d nodes status took %v.", len(nodes), time.Since(start))
 	}()

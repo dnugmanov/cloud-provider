@@ -29,6 +29,11 @@ import (
 	restclient "k8s.io/client-go/rest"
 )
 
+const (
+	// UnmanagedNodeLabelKey is the annotation placed on nodes that CCM is to ignore.
+	UnmanagedNodeLabelKey = "node.kubernetes.io/exclude-from-CCM"
+)
+
 // ControllerClientBuilder allows you to get clients and configs for controllers
 // Please note a copy also exists in pkg/controller/client_builder.go
 // TODO: Make this depend on the separate controller utilities repo (issues/68947)

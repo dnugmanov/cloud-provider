@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"strconv"
 	"sync"
 	"time"
 
@@ -185,6 +186,21 @@ func (rc *RouteController) reconcile(ctx context.Context, nodes []*v1.Node, rout
 	// Check Nodes and their Pod CIDRs. Then put expected route actions into nodePodCIDRActionMap.
 	// Add addresses of Nodes into routeMap.
 	for _, node := range nodes {
+		// Check whether the node "unmanaged" label value is explicitly set to true, in which case the node is skipped.
+		// Otherwise, the node must be considered, and we proceed to checking whether we must delete it or apply the shutdown taint.
+		if value, exists := node.Labels[cloudprovider.UnmanagedNodeLabelKey]; exists {
+			unmanagedNode, err := strconv.ParseBool(value)
+			if err != nil {
+				// Skip node if label is present and an error occurs while decoding the value
+				klog.Warningf("failed to parse the value of the %q label: %v", cloudprovider.UnmanagedNodeLabelKey, err)
+				continue
+			}
+			if unmanagedNode {
+				klog.V(6).Infof("skipping unmanaged node %q", node.Name)
+				continue
+			}
+		}
+
 		// Skip if the node hasn't been assigned a CIDR yet.
 		if len(node.Spec.PodCIDRs) == 0 {
 			continue
@@ -265,6 +281,21 @@ func (rc *RouteController) reconcile(ctx context.Context, nodes []*v1.Node, rout
 
 	// Now create new routes or update existing ones.
 	for _, node := range nodes {
+		// Check whether the node "unmanaged" label value is explicitly set to true, in which case the node is skipped.
+		// Otherwise, the node must be considered, and we proceed to checking whether we must delete it or apply the shutdown taint.
+		if value, exists := node.Labels[cloudprovider.UnmanagedNodeLabelKey]; exists {
+			unmanagedNode, err := strconv.ParseBool(value)
+			if err != nil {
+				// Skip node if label is present and an error occurs while decoding the value
+				klog.Warningf("failed to parse the value of the %q label: %v", cloudprovider.UnmanagedNodeLabelKey, err)
+				continue
+			}
+			if unmanagedNode {
+				klog.V(6).Infof("skipping unmanaged node %q", node.Name)
+				continue
+			}
+		}
+
 		// Skip if the node hasn't been assigned a CIDR yet.
 		if len(node.Spec.PodCIDRs) == 0 {
 			continue
