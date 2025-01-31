@@ -296,6 +296,17 @@ func (cnc *CloudNodeController) UpdateNodeStatus(ctx context.Context) error {
 
 	updateNodeFunc := func(piece int) {
 		node := nodes[piece].DeepCopy()
+		if value, exists := node.Labels[cloudprovider.UnmanagedNodeLabelKey]; exists {
+			unmanagedNode, err := strconv.ParseBool(value)
+			if err != nil {
+				klog.Warningf("failed to parse the value of the %q label: %v", cloudprovider.UnmanagedNodeLabelKey, err)
+				return
+			}
+			if unmanagedNode {
+				klog.V(6).Infof("skipping unmanaged node %q", node.Name)
+				return
+			}
+		}
 		// Do not process nodes that are still tainted, those will be processed by syncNode()
 		cloudTaint := getCloudTaint(node.Spec.Taints)
 		if cloudTaint != nil {
