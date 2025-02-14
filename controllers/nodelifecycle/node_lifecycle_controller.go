@@ -19,6 +19,7 @@ package nodelifecycle
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -134,6 +135,21 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 	}
 
 	for _, node := range nodes {
+		// Check whether the node "unmanaged" label value is explicitly set to true, in which case the node is skipped.
+		// Otherwise, the node must be considered, and we proceed to checking whether we must delete it or apply the shutdown taint.
+		if value, exists := node.Labels[cloudprovider.UnmanagedNodeLabelKey]; exists {
+			unmanagedNode, err := strconv.ParseBool(value)
+			if err != nil {
+				// Skip node if label is present and an error occurs while decoding the value
+				klog.Warningf("failed to parse the value of the %q label: %v", cloudprovider.UnmanagedNodeLabelKey, err)
+				continue
+			}
+			if unmanagedNode {
+				klog.V(6).Infof("skipping unmanaged node %q", node.Name)
+				continue
+			}
+		}
+
 		// Default NodeReady status to v1.ConditionUnknown
 		status := v1.ConditionUnknown
 		if _, c := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady); c != nil {
